@@ -1,0 +1,5 @@
+streamlit
+schedule
+pyttsx3
+win10toast
+plyer
