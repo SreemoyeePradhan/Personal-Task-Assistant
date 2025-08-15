@@ -4,7 +4,7 @@ from datetime import datetime, date, time as dtime
 
 import streamlit as st
 from assistant import (
-    add_task, load_tasks, delete_task, mark_done, validate_due_str
+    add_task, load_tasks, delete_task, mark_done
 )
 import reminder
 
@@ -34,20 +34,50 @@ with st.sidebar:
 # --- Add Task ---
 st.subheader("➕ Add a New Task")
 col1, col2 = st.columns(2)
+
 with col1:
     desc = st.text_input("Task description", placeholder="e.g., Call mom")
+    recurrence_choice = st.selectbox(
+        "Recurrence",
+        options=["None", "Daily", "Weekly", "Monthly", "Yearly", "Every X minutes"],
+        index=0
+    )
+    minutes_interval = None
+    if recurrence_choice == "Every X minutes":
+        minutes_interval = st.number_input(
+            "Interval (minutes)", min_value=1, max_value=1440, value=5
+        )
+
 with col2:
     # Combine a date and time input into the required string format
     due_date = st.date_input("Due date", value=date.today())
-    due_time = st.time_input("Due time (HH:MM)", value=dtime(hour=datetime.now().hour, minute=(datetime.now().minute + 1) % 60))
+    due_time = st.time_input(
+        "Due time (HH:MM)",
+        value=dtime(
+            hour=datetime.now().hour,
+            minute=(datetime.now().minute + 1) % 60
+        )
+    )
 
 if st.button("Add Task"):
-    due_str = f"{due_date.strftime('%Y-%m-%d')} {due_time.strftime('%H:%M')}"
-    try:
-        add_task(desc, due_str)
-        st.success(f"Added: {desc} @ {due_str}")
-    except Exception as e:
-        st.error(str(e))
+    if not desc.strip():
+        st.warning("Please enter a task description.")
+    else:
+        recurrence_map = {
+            "None": None,
+            "Daily": "daily",
+            "Weekly": "weekly",
+            "Monthly": "monthly",
+            "Yearly": "yearly",
+            "Every X minutes": "every_x_minutes"
+        }
+        recurrence = recurrence_map.get(recurrence_choice, None)
+        due_str = f"{due_date.strftime('%Y-%m-%d')} {due_time.strftime('%H:%M')}"
+        try:
+            add_task(desc, due_str, recurrence, minutes_interval)
+            st.success(f"Added: {desc} @ {due_str} ({recurrence_choice})")
+        except Exception as e:
+            st.error(str(e))
 
 # --- Task List ---
 st.subheader("📋 Tasks")
@@ -59,7 +89,9 @@ else:
         c1, c2, c3, c4 = st.columns([6, 3, 1.4, 1.4])
         with c1:
             st.write(f"**{i+1}. {task.get('description','')}**")
-            st.caption(f"Due: {task.get('due','N/A')}")
+            rec = task.get("recurrence")
+            rec_label = rec.capitalize() if rec else "None"
+            st.caption(f"Due: {task.get('due','N/A')} — Recurrence: {rec_label}")
         with c2:
             done_flag = task.get("done", False)
             st.write("✅ Done" if done_flag else "⏳ Pending")

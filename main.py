@@ -1,4 +1,4 @@
-# main.py
+# main.py (unchanged)
 import threading
 import time
 from assistant import speak
