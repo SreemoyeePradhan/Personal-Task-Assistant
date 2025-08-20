@@ -4,7 +4,7 @@ from datetime import datetime, date, time as dtime
 
 import streamlit as st
 from assistant import (
-    add_task, load_tasks, delete_task, mark_done
+    add_task, load_tasks, delete_task, mark_done, parse_nlp_task
 )
 import reminder
 
@@ -31,12 +31,43 @@ with st.sidebar:
     st.caption("Keep this page open if you rely on the scheduler here. "
                "Alternatively, run `python main.py` to keep reminders running without the browser.")
 
-# --- Add Task ---
-st.subheader("➕ Add a New Task")
+# --- Add Task (Option 1: Natural Language Input) ---
+st.subheader("➕ Add a New Task (Smart Input)")
+nlp_text = st.text_area(
+    "Describe your task naturally",
+    placeholder="e.g., Call mom tomorrow at 6 pm every week"
+)
+
+if st.button("Add via NLP"):
+    if not nlp_text.strip():
+        st.warning("Please enter a description.")
+    else:
+        try:
+            parsed = parse_nlp_task(nlp_text)
+
+            if not parsed or "description" not in parsed:
+                st.error("❌ Could not extract a valid task description. Please try again.")
+            else:
+                desc = parsed.get("description", "Untitled Task")
+                due_str = parsed.get("due", None)
+                recurrence = parsed.get("recurrence", None)
+                interval = parsed.get("minutes_interval", None)
+
+                add_task(desc, due_str, recurrence, interval)
+                st.success(f"✅ Added: {desc} @ {due_str or 'N/A'} ({recurrence or 'None'})")
+
+            # Debug view for dev/testing
+            st.json(parsed)
+
+        except Exception as e:
+            st.error(f" Parsing failed. Try formats like 'Call mom tomorrow at 6 pm' or 'Submit report 2025-08-17 14:30'. Error: {e}")
+
+# --- Add Task (Option 2: Manual Form) ---
+st.subheader("➕ Add a New Task (Manual Entry)")
 col1, col2 = st.columns(2)
 
 with col1:
-    desc = st.text_input("Task description", placeholder="e.g., Call mom")
+    desc = st.text_input("Task description", placeholder="e.g., Finish report")
     recurrence_choice = st.selectbox(
         "Recurrence",
         options=["None", "Daily", "Weekly", "Monthly", "Yearly", "Every X minutes"],
@@ -49,7 +80,6 @@ with col1:
         )
 
 with col2:
-    # Combine a date and time input into the required string format
     due_date = st.date_input("Due date", value=date.today())
     due_time = st.time_input(
         "Due time (HH:MM)",
@@ -59,7 +89,7 @@ with col2:
         )
     )
 
-if st.button("Add Task"):
+if st.button("Add via Form"):
     if not desc.strip():
         st.warning("Please enter a task description.")
     else:
@@ -75,7 +105,7 @@ if st.button("Add Task"):
         due_str = f"{due_date.strftime('%Y-%m-%d')} {due_time.strftime('%H:%M')}"
         try:
             add_task(desc, due_str, recurrence, minutes_interval)
-            st.success(f"Added: {desc} @ {due_str} ({recurrence_choice})")
+            st.success(f"✅ Added: {desc} @ {due_str} ({recurrence_choice})")
         except Exception as e:
             st.error(str(e))
 
@@ -98,11 +128,11 @@ else:
         with c3:
             if st.button("Toggle", key=f"toggle_{i}"):
                 mark_done(i, not task.get("done", False))
-                st.experimental_rerun()
+                st.rerun()
         with c4:
             if st.button("🗑️ Delete", key=f"delete_{i}"):
                 delete_task(i)
-                st.experimental_rerun()
+                st.rerun()
 
 st.markdown("---")
-st.caption("Tip: The reminder checks at minute granularity (YYYY-MM-DD HH:MM).")
+st.caption("Tip: Try adding tasks in natural language (e.g., 'Submit assignment next Monday 9am, repeat weekly').")
